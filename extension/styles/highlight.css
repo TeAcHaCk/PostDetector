@@ -1,0 +1,160 @@
+/* Highlighted Post Container */
+.impersonation-highlighted {
+  position: relative !important;
+  border: 4px solid #ff4444 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, rgba(255, 68, 68, 0.08) 0%, rgba(255, 68, 68, 0.03) 100%) !important;
+  box-shadow: 
+    0 0 0 2px rgba(255, 68, 68, 0.3),
+    0 0 25px rgba(255, 68, 68, 0.4),
+    inset 0 0 20px rgba(255, 68, 68, 0.05) !important;
+  transition: all 0.3s ease !important;
+  margin: 8px 0 !important;
+  overflow: visible !important;
+  z-index: 10 !important;
+}
+
+.impersonation-highlighted:hover {
+  box-shadow: 
+    0 0 0 3px rgba(255, 68, 68, 0.4),
+    0 0 35px rgba(255, 68, 68, 0.5),
+    inset 0 0 25px rgba(255, 68, 68, 0.08) !important;
+}
+
+/* Add a corner badge indicator */
+.impersonation-highlighted::before {
+  content: '⚠️ FLAGGED';
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(255, 68, 68, 0.5);
+  z-index: 1001;
+}
+
+/* Pulse animation for newly highlighted posts */
+@keyframes highlight-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(255, 107, 107, 0.6);
+  }
+}
+
+.highlight-pulse {
+  animation: highlight-pulse 1s ease-in-out 3;
+}
+
+/* Warning Banner */
+.impersonation-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+  color: white;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+  position: relative;
+  z-index: 1000;
+}
+
+.warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.warning-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.warning-dismiss {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.warning-dismiss:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+
+
+/* Notification Styles */
+.impersonation-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10000;
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s ease;
+}
+
+.impersonation-notification.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.impersonation-notification.success {
+  border-left: 4px solid #51cf66;
+  color: #2b8a3e;
+}
+
+.impersonation-notification.error {
+  border-left: 4px solid #ff6b6b;
+  color: #c92a2a;
+}
+
+.impersonation-notification.info {
+  border-left: 4px solid #339af0;
+  color: #1864ab;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .impersonation-notification {
+    right: 10px;
+    left: 10px;
+    top: 10px;
+  }
+
+  .impersonation-warning-banner {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post Detector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="header-icon">⚠️</div>
+      <h1>Post Detector</h1>
+      <div class="header-subtitle">Social Media Protection</div>
+    </header>
+
+    <!-- Statistics Dashboard -->
+    <section class="stats-section">
+      <h2>Current Page</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="totalPosts">-</div>
+          <div class="stat-label">Posts Scanned</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-value" id="flaggedCount">-</div>
+          <div class="stat-label">Flagged</div>
+        </div>
+      </div>
+
+      <div class="platform-info">
+        <span class="platform-label">Platform:</span>
+        <span class="platform-name" id="platformName">-</span>
+      </div>
+    </section>
+
+    <!-- Global Statistics -->
+    <section class="global-stats-section">
+      <h2>Global Statistics</h2>
+      <div class="global-stats" id="globalStats">
+        <div class="loading">Loading statistics...</div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="actions-section">
+      <button id="flagBtn" class="action-btn danger">
+        <span class="btn-icon">🚩</span>
+        <span class="btn-text">Flag Detection</span>
+      </button>
+      <button id="refreshBtn" class="action-btn primary">
+        <span class="btn-icon">🔄</span>
+        <span class="btn-text">Refresh Data</span>
+      </button>
+      <button id="syncBtn" class="action-btn">
+        <span class="btn-icon">📥</span>
+        <span class="btn-text">Sync All Platforms</span>
+      </button>
+    </section>
+
+    <!-- Settings -->
+    <section class="settings-section">
+      <h2>Settings</h2>
+      <div class="setting-item">
+        <label class="toggle-label">
+          <input type="checkbox" id="enableHighlighting" class="toggle-input" checked>
+          <span class="toggle-slider"></span>
+          <span class="toggle-text">Enable Highlighting</span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label class="toggle-label">
+          <input type="checkbox" id="showNotifications" class="toggle-input" checked>
+          <span class="toggle-slider"></span>
+          <span class="toggle-text">Show Notifications</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="popup-footer">
+      <div class="last-sync">
+        Last sync: <span id="lastSync">Never</span>
+      </div>
+      <div class="version">v1.0.0</div>
+    </footer>
+
+    <!-- Status Message -->
+    <div id="statusMessage" class="status-message"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
