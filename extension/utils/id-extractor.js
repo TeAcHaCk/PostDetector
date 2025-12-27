@@ -34,19 +34,21 @@ class PostIDExtractor {
     if (storyID) return storyID;
 
     // Method 2: Find links within the post
-    const links = element.querySelectorAll('a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="/watch/"], a[href*="/story.php"]');
+    const links = element.querySelectorAll('a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="/watch/"], a[href*="/story.php"], a[href*="/groups/"], a[href*="/photo"]');
     for (const link of links) {
       const href = link.getAttribute('href');
 
       // Patterns
       const patterns = [
-        /\/posts\/(\d+)/,
-        /\/permalink\/(\d+)/,
-        /story_fbid=(\d+)/,
-        /\/videos\/(\d+)/,
-        /\/reel\/(\d+)/,
-        /\/watch\/\?v=(\d+)/,
-        /fbid=(\d+)/
+        /\/posts\/([A-Za-z0-9]+)/,
+        /\/permalink\/([A-Za-z0-9]+)/,
+        /story_fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+        /\/videos\/([A-Za-z0-9]+)/,
+        /\/reel\/([A-Za-z0-9]+)/,
+        /\/watch\/\?v=([A-Za-z0-9]+)/,
+        /fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+        /multi_permalinks=([A-Za-z0-9]+)/,  // Facebook Groups multi_permalinks
+        /set=.*?([0-9]+)/  // Photo set IDs
       ];
 
       for (const pattern of patterns) {
@@ -58,12 +60,14 @@ class PostIDExtractor {
     // Method 3: Check current URL
     const url = window.location.href;
     const urlPatterns = [
-      /\/posts\/(\d+)/,
-      /\/permalink\/(\d+)/,
-      /\/videos\/(\d+)/,
-      /\/reel\/(\d+)/,
-      /story_fbid=(\d+)/,
-      /fbid=(\d+)/
+      /\/posts\/([A-Za-z0-9]+)/,
+      /\/permalink\/([A-Za-z0-9]+)/,
+      /\/videos\/([A-Za-z0-9]+)/,
+      /\/reel\/([A-Za-z0-9]+)/,
+      /story_fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+      /fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+      /multi_permalinks=([A-Za-z0-9]+)/,  // Facebook Groups multi_permalinks
+      /set=.*?([0-9]+)/  // Photo set IDs
     ];
 
     for (const pattern of urlPatterns) {

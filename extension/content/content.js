@@ -6,6 +6,8 @@
     let extractor, highlighter, observer;
     let flaggedPosts = new Set();
     let processedPosts = new Set();
+    let currentUrl = window.location.href;
+    let navigationCheckInterval = null;
 
     // Initialize extension
     async function init() {
@@ -18,14 +20,70 @@
         // Load flagged posts from backend
         await loadFlaggedPosts();
 
-        // Scan existing posts on page
-        scanExistingPosts();
+        // Schedule multiple scans to catch late-loading posts
+        scheduleMultipleScans();
 
         // Start observing for new posts
         observer = new PostObserver(handleNewPost);
         observer.start();
 
+        // Start navigation detection for SPA navigation
+        startNavigationDetection();
+
         console.log('[Post Detector] Initialization complete');
+    }
+
+    // Detect SPA navigation (URL changes without page reload)
+    function startNavigationDetection() {
+        // Method 1: Override History API
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function (...args) {
+            originalPushState.apply(this, args);
+            handleNavigation();
+        };
+
+        history.replaceState = function (...args) {
+            originalReplaceState.apply(this, args);
+            handleNavigation();
+        };
+
+        // Method 2: Listen for popstate (back/forward navigation)
+        window.addEventListener('popstate', handleNavigation);
+
+        // Method 3: Polling fallback for other navigation methods
+        navigationCheckInterval = setInterval(() => {
+            if (window.location.href !== currentUrl) {
+                handleNavigation();
+            }
+        }, 1000);
+
+        console.log('[Post Detector] Navigation detection started');
+    }
+
+    // Handle navigation to new page
+    async function handleNavigation() {
+        const newUrl = window.location.href;
+
+        // Skip if URL hasn't actually changed
+        if (newUrl === currentUrl) return;
+
+        console.log('[Post Detector] Navigation detected:', currentUrl, '->', newUrl);
+        currentUrl = newUrl;
+
+        // Clear processed posts (new page, new posts)
+        processedPosts.clear();
+
+        // Re-fetch flagged posts (in case new ones were added)
+        await loadFlaggedPosts();
+
+        // Wait a bit for new page content to load, then do multiple scans
+        setTimeout(() => {
+            // Schedule multiple scans to catch late-loading posts
+            scheduleMultipleScans();
+            console.log('[Post Detector] Page rescanned after navigation');
+        }, 300);
     }
 
     // Load flagged posts from backend
@@ -80,8 +138,30 @@
     function scanExistingPosts() {
         const posts = findAllPosts();
         console.log(`[Post Detector] Found ${posts.length} existing posts to scan`);
+        console.log(`[Post Detector] Flagged posts in memory:`, Array.from(flaggedPosts));
 
-        posts.forEach(post => processPost(post));
+        let highlightedCount = 0;
+        posts.forEach(post => {
+            const result = processPost(post);
+            if (result?.highlighted) highlightedCount++;
+        });
+
+        console.log(`[Post Detector] Highlighted ${highlightedCount} flagged posts`);
+    }
+
+    // Schedule multiple scans to catch late-loading content
+    function scheduleMultipleScans() {
+        // Immediate scan
+        scanExistingPosts();
+
+        // Retry scans at intervals to catch lazy-loaded content
+        const retryDelays = [500, 1500, 3000];
+        retryDelays.forEach(delay => {
+            setTimeout(() => {
+                console.log(`[Post Detector] Retry scan after ${delay}ms`);
+                scanExistingPosts();
+            }, delay);
+        });
     }
 
     // Find all post elements on current page
@@ -90,31 +170,74 @@
 
         switch (extractor.platform) {
             case 'facebook':
-                // Primary: Use aria-posinset (individual feed items)
-                const feedItems = document.querySelectorAll('[aria-posinset]');
+                // Strategy 1: aria-posinset (feed items)
+                let feedItems = document.querySelectorAll('[aria-posinset]');
                 if (feedItems.length > 0) {
                     elements = Array.from(feedItems);
                     console.log(`[Post Detector] Found ${elements.length} posts via aria-posinset`);
-                } else {
-                    // Fallback: FeedUnit pagelets
-                    const feedUnits = document.querySelectorAll('[data-pagelet*="FeedUnit"]');
-                    if (feedUnits.length > 0) {
-                        elements = Array.from(feedUnits);
-                        console.log(`[Post Detector] Found ${elements.length} posts via FeedUnit`);
-                    } else {
-                        // Last resort: articles with post links
-                        const articles = document.querySelectorAll('div[role="article"]');
-                        articles.forEach(article => {
-                            const parentArticle = article.parentElement?.closest('div[role="article"]');
-                            if (!parentArticle) {
-                                const hasPostLink = article.querySelector('a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"]');
-                                if (hasPostLink) {
-                                    elements.push(article);
-                                }
-                            }
-                        });
-                        console.log(`[Post Detector] Found ${elements.length} posts via articles`);
+                    break;
+                }
+
+                // Strategy 2: FeedUnit pagelets
+                const feedUnits = document.querySelectorAll('[data-pagelet*="FeedUnit"]');
+                if (feedUnits.length > 0) {
+                    elements = Array.from(feedUnits);
+                    console.log(`[Post Detector] Found ${elements.length} posts via FeedUnit`);
+                    break;
+                }
+
+                // Strategy 3: Search results - look for feed container children
+                const feedContainer = document.querySelector('div[role="feed"]');
+                if (feedContainer) {
+                    // Get direct children of feed that contain post-like links
+                    const feedChildren = feedContainer.querySelectorAll(':scope > div');
+                    feedChildren.forEach(child => {
+                        const hasPostLink = child.querySelector('a[href*="/posts/"], a[href*="/permalink/"], a[href*="story_fbid="], a[href*="multi_permalinks="], a[href*="/groups/"]');
+                        if (hasPostLink) {
+                            elements.push(child);
+                        }
+                    });
+                    if (elements.length > 0) {
+                        console.log(`[Post Detector] Found ${elements.length} posts via feed container`);
+                        break;
                     }
+                }
+
+                // Strategy 4: Articles with post links (most inclusive)
+                const articles = document.querySelectorAll('div[role="article"]');
+                const seenElements = new Set();
+                articles.forEach(article => {
+                    const parentArticle = article.parentElement?.closest('div[role="article\"]');
+                    if (!parentArticle) {
+                        const hasPostLink = article.querySelector(
+                            'a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="story_fbid="], a[href*="multi_permalinks="]'
+                        );
+                        if (hasPostLink && !seenElements.has(article)) {
+                            elements.push(article);
+                            seenElements.add(article);
+                        }
+                    }
+                });
+
+                // Strategy 5: Any container with post links (last resort for search results)
+                if (elements.length === 0) {
+                    const allPostLinks = document.querySelectorAll(
+                        'a[href*="/posts/"], a[href*="story_fbid="], a[href*="multi_permalinks="], a[href*="/permalink.php"]'
+                    );
+                    allPostLinks.forEach(link => {
+                        // Find a reasonable parent container
+                        let container = link.closest('[class*="x1yztbdb"]') ||
+                            link.closest('[class*="x1lliihq"]') ||
+                            link.closest('div[data-ad-preview]')?.parentElement ||
+                            link.parentElement?.parentElement?.parentElement;
+                        if (container && !seenElements.has(container)) {
+                            elements.push(container);
+                            seenElements.add(container);
+                        }
+                    });
+                    console.log(`[Post Detector] Found ${elements.length} posts via post links fallback`);
+                } else {
+                    console.log(`[Post Detector] Found ${elements.length} posts via articles`);
                 }
                 break;
             case 'instagram':
@@ -142,10 +265,10 @@
     function processPost(postElement) {
         const postId = extractor.extractPostID(postElement);
 
-        if (!postId) return;
+        if (!postId) return { highlighted: false, postId: null };
 
         // Skip if already processed
-        if (processedPosts.has(postId)) return;
+        if (processedPosts.has(postId)) return { highlighted: false, postId, skipped: true };
         processedPosts.add(postId);
 
         // For Facebook, find the correct main post container (not comments)
@@ -154,7 +277,7 @@
             targetElement = findFacebookMainPost(postElement);
             if (!targetElement) {
                 console.log(`[Post Detector] Could not find main post container for ID: ${postId}`);
-                return;
+                return { highlighted: false, postId };
             }
         }
 
@@ -162,10 +285,15 @@
         targetElement.setAttribute('data-post-id', postId);
 
         // Highlight if flagged
-        if (flaggedPosts.has(postId)) {
+        const isFlagged = flaggedPosts.has(postId);
+        if (isFlagged) {
+            console.log(`[Post Detector] ✅ Highlighting flagged post: ${postId}`);
             highlighter.highlightPost(targetElement, 'impersonation');
             highlighter.pulseHighlight(targetElement);
+            return { highlighted: true, postId };
         }
+
+        return { highlighted: false, postId };
     }
 
     // Find the main Facebook post container (not comment section)
