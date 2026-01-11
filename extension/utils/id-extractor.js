@@ -29,27 +29,61 @@ class PostIDExtractor {
   }
 
   extractFacebookID(element) {
-    // Method 1: Check for data attributes
+    // Method 0: Check for NATIVE data-post-id attribute (BEST - Facebook provides this directly!)
+    // This is the most reliable method as Facebook explicitly marks posts with their IDs
+    const nativePostId = element.getAttribute('data-post-id');
+    if (nativePostId) {
+      console.log(`[ID Extractor] Found native data-post-id: ${nativePostId}`);
+      return nativePostId;
+    }
+
+    // Also check if the element has a child with data-post-id (for containers like aria-posinset)
+    const childWithPostId = element.querySelector('[data-post-id]');
+    if (childWithPostId) {
+      const childPostId = childWithPostId.getAttribute('data-post-id');
+      console.log(`[ID Extractor] Found child with data-post-id: ${childPostId}`);
+      return childPostId;
+    }
+
+    // Method 1: Check for data-store-id attribute
     const storyID = element.querySelector('[data-store-id]')?.getAttribute('data-store-id');
     if (storyID) return storyID;
 
-    // Method 2: Find links within the post
+    // Method 2: Find links within the post - but be careful to only use links that belong to THIS post
+    // not links from nested comments or other posts
     const links = element.querySelectorAll('a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="/watch/"], a[href*="/story.php"], a[href*="/groups/"], a[href*="/photo"]');
-    for (const link of links) {
-      const href = link.getAttribute('href');
 
-      // Patterns
-      const patterns = [
-        /\/posts\/([A-Za-z0-9]+)/,
-        /\/permalink\/([A-Za-z0-9]+)/,
-        /story_fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
-        /\/videos\/([A-Za-z0-9]+)/,
-        /\/reel\/([A-Za-z0-9]+)/,
-        /\/watch\/\?v=([A-Za-z0-9]+)/,
-        /fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
-        /multi_permalinks=([A-Za-z0-9]+)/,  // Facebook Groups multi_permalinks
-        /set=.*?([0-9]+)/  // Photo set IDs
-      ];
+    // Patterns to extract post IDs
+    const patterns = [
+      /\/posts\/([A-Za-z0-9]+)/,
+      /\/permalink\/([A-Za-z0-9]+)/,
+      /story_fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+      /\/videos\/([A-Za-z0-9]+)/,
+      /\/reel\/([A-Za-z0-9]+)/,
+      /\/watch\/\?v=([A-Za-z0-9]+)/,
+      /fbid=([A-Za-z0-9]+)/,  // Supports both numeric and pfbid format
+      /multi_permalinks=([A-Za-z0-9]+)/,  // Facebook Groups multi_permalinks
+      /set=.*?([0-9]+)/  // Photo set IDs
+    ];
+
+    for (const link of links) {
+      // CRITICAL: Verify this link belongs to THIS post, not a nested post/comment
+      // Only apply this check if the element we're scanning is an article
+      // For non-article elements (like aria-posinset containers), be more permissive
+
+      const isElementAnArticle = element.matches && element.matches('div[role="article"]');
+
+      if (isElementAnArticle) {
+        const linkParentArticle = link.closest('div[role="article"]');
+
+        // If link is in a DIFFERENT article that is NESTED INSIDE our element, skip it
+        if (linkParentArticle && linkParentArticle !== element && element.contains(linkParentArticle)) {
+          // This link is inside a nested comment/article within our post - skip it
+          continue;
+        }
+      }
+
+      const href = link.getAttribute('href');
 
       for (const pattern of patterns) {
         const match = href.match(pattern);
@@ -57,7 +91,7 @@ class PostIDExtractor {
       }
     }
 
-    // Method 3: Check current URL
+    // Method 3: Check current URL (only for single-post views)
     const url = window.location.href;
     const urlPatterns = [
       /\/posts\/([A-Za-z0-9]+)/,

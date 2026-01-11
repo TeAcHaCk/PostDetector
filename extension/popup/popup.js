@@ -134,6 +134,44 @@ async function loadSettings() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Scan Page button - Primary action
+    document.getElementById('scanPageBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('scanPageBtn');
+        const originalText = btn.querySelector('.btn-text').textContent;
+
+        try {
+            // Update button to show scanning
+            btn.disabled = true;
+            btn.querySelector('.btn-text').textContent = 'Scanning...';
+            btn.querySelector('.btn-icon').textContent = '⏳';
+            showStatus('Scanning page for flagged posts...', 'info');
+
+            // First refresh flagged posts from backend
+            await sendMessageToActiveTab('refreshFlaggedPosts');
+
+            // Then trigger a full page scan
+            const response = await sendMessageToActiveTab('scanPage');
+
+            if (response) {
+                const { scannedCount, highlightedCount } = response;
+                showStatus(`Scanned ${scannedCount} posts, found ${highlightedCount} flagged`, 'success');
+
+                // Update stats display
+                await loadPageStats();
+            } else {
+                showStatus('Scan complete', 'success');
+            }
+        } catch (error) {
+            console.error('Error scanning page:', error);
+            showStatus('Failed to scan page', 'error');
+        } finally {
+            // Restore button
+            btn.disabled = false;
+            btn.querySelector('.btn-text').textContent = originalText;
+            btn.querySelector('.btn-icon').textContent = '🔍';
+        }
+    });
+
     // Flag button
     document.getElementById('flagBtn').addEventListener('click', async () => {
         showStatus('Sending flag command...', 'info');

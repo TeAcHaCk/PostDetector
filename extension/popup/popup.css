@@ -238,6 +238,37 @@ body {
     background: linear-gradient(135deg, #5568d3 0%, #6a3f91 100%);
 }
 
+.action-btn.scan-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+    color: white;
+    font-size: 15px;
+    padding: 14px 20px;
+}
+
+.action-btn.scan-btn:hover {
+    background: linear-gradient(135deg, #40c057 0%, #2f9e44 100%);
+}
+
+.action-btn.scan-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.action-btn.danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+}
+
+.action-btn.danger:hover {
+    background: linear-gradient(135deg, #ee5a52 0%, #e03131 100%);
+}
+
+.secondary-actions {
+    padding-top: 10px;
+}
+
 .btn-icon {
     font-size: 16px;
 }

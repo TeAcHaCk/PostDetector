@@ -52,7 +52,20 @@ class PostHighlighter {
 
   // Find the correct Facebook post container (not the comment section)
   findFacebookPostContainer(element, postId) {
-    // Strategy 1: Look for aria-posinset (Facebook feed item marker)
+    // Strategy 0: If the element already has data-post-id or aria-posinset, it's already the correct container!
+    // Facebook's native DOM structure uses these attributes on the proper post element
+    if (element.hasAttribute('data-post-id')) {
+      console.log('[Highlighter] Element already has data-post-id, using it directly');
+      return element;
+    }
+
+    // Elements with aria-posinset are feed items - they ARE the container
+    if (element.hasAttribute('aria-posinset')) {
+      console.log('[Highlighter] Element has aria-posinset (feed item), using it directly');
+      return element;
+    }
+
+    // Strategy 1: Look for aria-posinset (Facebook feed item marker) - most reliable
     const feedItem = element.closest('[aria-posinset]');
     if (feedItem) {
       console.log('[Highlighter] Found container via aria-posinset');
@@ -77,7 +90,14 @@ class PostHighlighter {
         const hasPostLink = current.querySelector(
           'a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="/watch"]'
         );
-        if (hasPostLink) {
+
+        // Check it's not nested inside another article
+        const parentArticle = current.parentElement?.closest('div[role="article"]');
+
+        if (hasPostLink && !parentArticle) {
+          topArticle = current;
+          break;
+        } else if (hasPostLink) {
           topArticle = current;
         }
       }
@@ -89,14 +109,9 @@ class PostHighlighter {
       return topArticle;
     }
 
-    // Strategy 4: Find wrapper by looking for the post content div
-    // Facebook often wraps posts in specific container structures
-    const wrapper = element.closest('[class*="x1yztbdb"]') ||
-      element.closest('[class*="x1lliihq"]') ||
-      element;
-
-    console.log('[Highlighter] Using fallback wrapper');
-    return wrapper;
+    // Strategy 4: Use the element itself as fallback (it already has the data-post-id)
+    console.log('[Highlighter] Using element itself as container');
+    return element;
   }
 
   // Remove highlight from a post

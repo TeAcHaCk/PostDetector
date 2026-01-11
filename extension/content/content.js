@@ -167,78 +167,97 @@
     // Find all post elements on current page
     function findAllPosts() {
         let elements = [];
+        const seenElements = new Set();
 
         switch (extractor.platform) {
             case 'facebook':
-                // Strategy 1: aria-posinset (feed items)
-                let feedItems = document.querySelectorAll('[aria-posinset]');
-                if (feedItems.length > 0) {
-                    elements = Array.from(feedItems);
-                    console.log(`[Post Detector] Found ${elements.length} posts via aria-posinset`);
-                    break;
-                }
+                // IMPORTANT: We need to find ALL visible posts, not just those with data-post-id
+                // The main feed may have posts that need highlighting
 
-                // Strategy 2: FeedUnit pagelets
-                const feedUnits = document.querySelectorAll('[data-pagelet*="FeedUnit"]');
-                if (feedUnits.length > 0) {
-                    elements = Array.from(feedUnits);
-                    console.log(`[Post Detector] Found ${elements.length} posts via FeedUnit`);
-                    break;
-                }
+                // Helper to check if element is inside a dialog/modal (we want to exclude these)
+                const isInsideModal = (el) => {
+                    return el.closest('[role="dialog"]') !== null ||
+                        el.closest('[aria-modal="true"]') !== null;
+                };
 
-                // Strategy 3: Search results - look for feed container children
+                // Strategy 1: Find posts in the main feed container (role="feed")
+                // This is the most important for search results pages
                 const feedContainer = document.querySelector('div[role="feed"]');
                 if (feedContainer) {
-                    // Get direct children of feed that contain post-like links
-                    const feedChildren = feedContainer.querySelectorAll(':scope > div');
-                    feedChildren.forEach(child => {
-                        const hasPostLink = child.querySelector('a[href*="/posts/"], a[href*="/permalink/"], a[href*="story_fbid="], a[href*="multi_permalinks="], a[href*="/groups/"]');
-                        if (hasPostLink) {
-                            elements.push(child);
+                    // Look for aria-posinset elements inside the feed
+                    const feedPosts = feedContainer.querySelectorAll('[aria-posinset]');
+                    feedPosts.forEach(post => {
+                        if (!isInsideModal(post) && !seenElements.has(post)) {
+                            elements.push(post);
+                            seenElements.add(post);
+                        }
+                    });
+                    console.log(`[Post Detector] Found ${elements.length} posts in main feed via aria-posinset`);
+                }
+
+                // Strategy 2: Also find any elements with data-post-id that are NOT inside modals
+                // This catches posts that might be structured differently
+                const postsWithNativeId = document.querySelectorAll('[data-post-id]');
+                postsWithNativeId.forEach(post => {
+                    if (!isInsideModal(post) && !seenElements.has(post)) {
+                        elements.push(post);
+                        seenElements.add(post);
+                    }
+                });
+                if (postsWithNativeId.length > 0) {
+                    console.log(`[Post Detector] Also found ${postsWithNativeId.length} posts with data-post-id (${elements.length} total after dedup)`);
+                }
+
+                // Strategy 3: FeedUnit pagelets (alternative Facebook structure)
+                if (elements.length === 0) {
+                    const feedUnits = document.querySelectorAll('[data-pagelet*="FeedUnit"]');
+                    feedUnits.forEach(post => {
+                        if (!isInsideModal(post) && !seenElements.has(post)) {
+                            elements.push(post);
+                            seenElements.add(post);
                         }
                     });
                     if (elements.length > 0) {
-                        console.log(`[Post Detector] Found ${elements.length} posts via feed container`);
-                        break;
+                        console.log(`[Post Detector] Found ${elements.length} posts via FeedUnit`);
                     }
                 }
 
-                // Strategy 4: Articles with post links (most inclusive)
-                const articles = document.querySelectorAll('div[role="article"]');
-                const seenElements = new Set();
-                articles.forEach(article => {
-                    const parentArticle = article.parentElement?.closest('div[role="article\"]');
-                    if (!parentArticle) {
-                        const hasPostLink = article.querySelector(
-                            'a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="story_fbid="], a[href*="multi_permalinks="]'
-                        );
-                        if (hasPostLink && !seenElements.has(article)) {
-                            elements.push(article);
-                            seenElements.add(article);
-                        }
-                    }
-                });
-
-                // Strategy 5: Any container with post links (last resort for search results)
+                // Strategy 4: Top-level articles with post links (fallback)
                 if (elements.length === 0) {
-                    const allPostLinks = document.querySelectorAll(
-                        'a[href*="/posts/"], a[href*="story_fbid="], a[href*="multi_permalinks="], a[href*="/permalink.php"]'
-                    );
-                    allPostLinks.forEach(link => {
-                        // Find a reasonable parent container
-                        let container = link.closest('[class*="x1yztbdb"]') ||
-                            link.closest('[class*="x1lliihq"]') ||
-                            link.closest('div[data-ad-preview]')?.parentElement ||
-                            link.parentElement?.parentElement?.parentElement;
-                        if (container && !seenElements.has(container)) {
-                            elements.push(container);
-                            seenElements.add(container);
+                    const articles = document.querySelectorAll('div[role="article"]');
+                    articles.forEach(article => {
+                        const parentArticle = article.parentElement?.closest('div[role="article"]');
+                        if (!parentArticle && !isInsideModal(article)) {
+                            const hasPostLink = article.querySelector(
+                                'a[href*="/posts/"], a[href*="/permalink/"], a[href*="/videos/"], a[href*="/reel/"], a[href*="story_fbid="], a[href*="multi_permalinks="]'
+                            );
+                            if (hasPostLink && !seenElements.has(article)) {
+                                elements.push(article);
+                                seenElements.add(article);
+                            }
                         }
                     });
-                    console.log(`[Post Detector] Found ${elements.length} posts via post links fallback`);
-                } else {
-                    console.log(`[Post Detector] Found ${elements.length} posts via articles`);
+                    if (elements.length > 0) {
+                        console.log(`[Post Detector] Found ${elements.length} posts via articles`);
+                    }
                 }
+
+                // Strategy 5: Direct children of feed with post links (last resort)
+                if (elements.length === 0 && feedContainer) {
+                    const feedChildren = feedContainer.querySelectorAll(':scope > div');
+                    feedChildren.forEach(child => {
+                        const hasPostLink = child.querySelector('a[href*="/posts/"], a[href*="/permalink/"], a[href*="story_fbid="], a[href*="multi_permalinks="], a[href*="/groups/"]');
+                        if (hasPostLink && !isInsideModal(child) && !seenElements.has(child)) {
+                            elements.push(child);
+                            seenElements.add(child);
+                        }
+                    });
+                    if (elements.length > 0) {
+                        console.log(`[Post Detector] Found ${elements.length} posts via feed children fallback`);
+                    }
+                }
+
+                console.log(`[Post Detector] Total Facebook posts found: ${elements.length}`);
                 break;
             case 'instagram':
                 elements = Array.from(document.querySelectorAll('article'));
@@ -298,6 +317,18 @@
 
     // Find the main Facebook post container (not comment section)
     function findFacebookMainPost(element) {
+        // If the element already has aria-posinset, it IS the feed item - use it directly
+        if (element.hasAttribute('aria-posinset')) {
+            console.log('[Post Detector] Element already has aria-posinset, using it directly');
+            return element;
+        }
+
+        // If the element already has data-post-id, it's the correct container
+        if (element.hasAttribute('data-post-id')) {
+            console.log('[Post Detector] Element already has data-post-id, using it directly');
+            return element;
+        }
+
         // Strategy 1: Look for aria-posinset (Facebook feed item marker)
         // This is the most reliable selector for individual posts in the feed
         const feedItem = element.closest('[aria-posinset]');
@@ -522,6 +553,46 @@
                         }
                     });
                     sendResponse({ success: true });
+                });
+                return true; // Async response
+            } else if (request.action === 'scanPage') {
+                // Full page scan - clear ALL caches to force complete re-evaluation
+                console.log('[Post Detector] Manual scan triggered - clearing all caches and rescanning...');
+
+                // Clear processed posts cache
+                processedPosts.clear();
+
+                // Clear highlighter's internal tracking (important after page reload)
+                highlighter.clearAllHighlights();
+
+                // Re-fetch flagged posts to ensure we have latest data
+                loadFlaggedPosts().then(() => {
+                    // Scan all posts on the page
+                    const posts = findAllPosts();
+                    let highlightedCount = 0;
+
+                    console.log(`[Post Detector] Scanning ${posts.length} posts...`);
+                    console.log(`[Post Detector] Flagged posts in memory: [${Array.from(flaggedPosts).join(', ')}]`);
+
+                    posts.forEach(post => {
+                        const result = processPost(post);
+                        console.log(`[Post Detector] Post result:`, result);
+                        if (result?.highlighted) highlightedCount++;
+                    });
+
+                    console.log(`[Post Detector] Scan complete: ${posts.length} scanned, ${highlightedCount} highlighted`);
+
+                    sendResponse({
+                        success: true,
+                        scannedCount: posts.length,
+                        highlightedCount: highlightedCount
+                    });
+                }).catch(err => {
+                    console.error('[Post Detector] Scan failed:', err);
+                    sendResponse({
+                        success: false,
+                        error: err.message
+                    });
                 });
                 return true; // Async response
             } else if (request.action === 'getPageStats') {
